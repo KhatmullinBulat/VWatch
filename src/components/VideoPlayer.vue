@@ -1,39 +1,28 @@
 <template>
-  <div class="relative">
-    <video ref="videoElement" @play="onPlay" @pause="onPause" class="w-full"></video>
-    <div class="w-full absolute bottom-0 flex items-center gap-4 p-4">
-      <button @click="togglePlay" class="text-white">
-        <PlayIcon v-if="!isPlaying" class="h-6" />
-        <PauseIcon v-else class="h-6" />
-      </button>
-      <input
-        type="range"
-        min="0"
-        :max="duration"
-        step="0.1"
-        v-model="currentTime"
-        @input="seek"
-        class="w-full"
-      />
-      <span class="text-white">{{ formattedTime }}</span>
+  <div class="video-player">
+    <video ref="videoElement" @play="onPlay" @pause="onPause" class="video-element"></video>
+    <div class="controls">
+      <PlayButton @togglePlay="togglePlay" />
+      <ProgressBar :onUpdateProgress="setVideoTime" :onTimeUpdate="onTimeUpdate" />
+      <VideoTimeDisplay :onTimeUpdate="onTimeUpdate" />
     </div>
   </div>
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useVideoStore } from '@/stores/useVideoStore'
-import Hls from 'hls.js'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
-import { PlayIcon, PauseIcon } from '@heroicons/vue/24/solid'
+import Hls from 'hls.js'
+import ProgressBar from './ProgressBar.vue'
+import VideoTimeDisplay from './VideoTimeDisplay.vue'
+import PlayButton from './PlayButton.vue'
 
 const videoElement = ref(null)
 const videoStore = useVideoStore()
 
 // Используем состояния из стора
-const { isPlaying, currentTime, duration } = storeToRefs(videoStore)
-
-const formattedTime = ref('00:00')
+const { isPlaying } = storeToRefs(videoStore)
 
 const loadVideoFile = (source) => {
   if (Hls.isSupported()) {
@@ -56,7 +45,7 @@ onMounted(() => {
   })
 
   // Обновляем текущее время в сторе
-  videoElement.value?.addEventListener('timeupdate', setTime)
+  onTimeUpdate(setStoreTime)
 })
 
 // Управление воспроизведением
@@ -64,7 +53,6 @@ const togglePlay = () => {
   if (isPlaying.value) {
     videoElement.value.pause()
   } else {
-    console.log('test')
     videoElement.value.play()
   }
 }
@@ -77,26 +65,44 @@ const onPause = () => {
   isPlaying.value = false
 }
 
-const seek = () => {
-  videoElement.value.currentTime = currentTime.value
+function onTimeUpdate(func) {
+  videoElement.value?.addEventListener('timeupdate', func)
 }
 
-function setTime() {
+function setStoreTime() {
   videoStore.setCurrentTime(videoElement.value.currentTime)
+}
 
-  // Форматирование времени
-  formattedTime.value = computed(() => {
-    //console.log(currentTime.value)
-    const minutes = Math.floor(currentTime.value / 60)
-      .toString()
-      .padStart(2, '0')
-    const seconds = Math.floor(currentTime.value - minutes * 60)
-      .toString()
-      .padStart(2, '0')
-
-    return `${minutes}:${seconds}`
-  })
+function setVideoTime(time) {
+  videoElement.value.currentTime = time
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.video-player {
+  position: relative;
+}
+
+.video-element {
+  width: 100%;
+}
+
+.controls {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 20px;
+  width: calc(100% - 200px);
+  background: rgba(240, 240, 240, 0.25);
+  border-radius: 15px 15px 0 0;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10.2px);
+  -webkit-backdrop-filter: blur(10.2px);
+  padding: 20px 20px 15px 20px;
+  margin: 0 auto;
+}
+</style>
