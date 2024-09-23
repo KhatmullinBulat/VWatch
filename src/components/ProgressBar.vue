@@ -1,41 +1,30 @@
 <template>
   <div
     ref="progressContainer"
-    class="progress-container"
-    @click="setProgress($event)"
     @mousedown="startDragging"
     @touchstart="startDragging"
+    class="progress-container"
   >
     <div class="progress-bar shadow crosses" :style="{ width: progress + '%' }"></div>
   </div>
 </template>
 
 <script setup>
-import { useVideoStore } from '@/stores/useVideoStore'
-import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 
-const emit = defineEmits(['update-progress', 'time-update'])
+const emit = defineEmits(['get-progress'])
 
-const videoStore = useVideoStore()
-const { currentTime, duration } = storeToRefs(videoStore)
-
+const progress = ref(0)
 const progressContainer = ref(null)
 const isDragging = ref(false) // Флаг для отслеживания перетаскивания
 
-onMounted(() => {
-  if (duration.value > 0) {
-    emit('time-update', progress.value)
-  }
+const props = defineProps({
+  newProgress: Number
 })
 
-const progress = computed(() => {
-  return (currentTime.value / duration.value) * 100
+onBeforeUnmount(() => {
+  stopDragging()
 })
-
-function setProgress(event) {
-  calculateProgress(event)
-}
 
 function startDragging(event) {
   isDragging.value = true
@@ -73,21 +62,27 @@ function calculateProgress(event) {
       ? event.touches[0].clientX - containerRect.left
       : event.clientX - containerRect.left
 
+  const clampedX = Math.max(0, Math.min(containerWidth, clickX))
+
   // вычисляем процент прогресса
-  const newProgress = (clickX / containerWidth) * 100
+  const newProgress = (clampedX / containerWidth) * 100
 
   // Ограничиваем значения от 0 до 100
   const clampedProgress = Math.max(0, Math.min(100, newProgress))
 
-  // Вычисляем новое значение времени в секундах на основе процента
-  const newTime = (clampedProgress / 100) * duration.value
+  progress.value = clampedProgress
 
-  // обновляем значение в сторе
-  videoStore.setCurrentTime(newTime)
-
-  // обновляем videoElement
-  emit('update-progress', newTime)
+  emit('get-progress', progress.value)
 }
+
+// Функция для обновления прогресса при воспроизведении видео
+function updateVideoProgress() {
+  if (!isDragging.value) {
+    progress.value = props.newProgress
+  }
+}
+
+watch(() => props.newProgress, updateVideoProgress)
 </script>
 
 <style scoped>
@@ -97,6 +92,8 @@ function calculateProgress(event) {
   height: 10px;
   border-radius: 3px;
   background: #faf7f0;
+  user-select: none;
+  cursor: pointer;
 }
 
 .progress-bar {
@@ -106,6 +103,8 @@ function calculateProgress(event) {
   transition: width;
   transition-duration: 0s;
   transition-timing-function: ease-in-out;
+  user-select: none;
+  cursor: pointer;
 }
 
 .crosses {

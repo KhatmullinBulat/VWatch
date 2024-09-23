@@ -2,12 +2,12 @@
   <div class="flex flex-nowrap gap-2 text-white">
     <span>{{ formattedCurrentTime }}</span>
     /
-    <span> {{ formatedDurationTime }}</span>
+    <span> {{ formattedDurationTime }}</span>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useVideoStore } from '@/stores/useVideoStore'
 import { storeToRefs } from 'pinia'
 
@@ -16,52 +16,26 @@ const videoStore = useVideoStore()
 // Используем состояния из стора
 const { currentTime, duration } = storeToRefs(videoStore)
 
-const emit = defineEmits(['time-update'])
+// Форматирование времени длительности
+const formattedDurationTime = computed(() => formatTime(duration.value))
 
-onMounted(() => {
-  emit('time-update', formattedCurrentTime)
-})
+// Форматирование текущего времени
+const formattedCurrentTime = computed(() => formatTime(currentTime.value))
 
-const formatedDurationTime = computed(() => {
-  const durationHours = hours(duration.value)
-  const durationMinutes = minutes(duration.value, durationHours)
-  const durationSeconds = seconds(duration.value, durationMinutes)
-
-  if (durationHours < 1) {
-    return `${durationMinutes}:${durationSeconds}`
-  } else {
-    return `${durationHours}:${durationMinutes}:${durationSeconds}`
-  }
-})
-
-// Форматирование времени
-const formattedCurrentTime = computed(() => {
-  const currentHours = hours(currentTime.value)
-  const currentMinutes = minutes(currentTime.value, currentHours)
-  const currentSeconds = seconds(currentTime.value, currentMinutes)
-  if (currentHours < 1) {
-    return `${currentMinutes}:${currentSeconds}`
-  } else {
-    return `${currentHours}:${currentMinutes}:${currentSeconds}`
-  }
-})
-
-function hours(value) {
-  return Math.floor(value / 60 / 60)
+// Функция для форматирования времени в часы:минуты:секунды
+function formatTime(value) {
+  const hours = Math.floor(value / 3600)
     .toString()
     .padStart(2, '0')
-}
-
-function minutes(value, hours) {
-  return Math.floor(value / 60 - hours * 60)
+  const minutes = Math.floor((value % 3600) / 60)
     .toString()
     .padStart(2, '0')
-}
-
-function seconds(value, minutes) {
-  return Math.floor(value - minutes * 60)
+  const seconds = Math.floor(value % 60)
     .toString()
     .padStart(2, '0')
+
+  // Если меньше 1 часа, возвращаем формат минуты:секунды
+  return hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`
 }
 </script>
 

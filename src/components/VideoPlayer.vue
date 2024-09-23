@@ -1,28 +1,42 @@
 <template>
   <div class="video-player">
-    <video ref="videoElement" @play="onPlay" @pause="onPause" class="video-element"></video>
-    <div class="controls">
-      <PlayButton @togglePlay="togglePlay" />
-      <ProgressBar :onUpdateProgress="setVideoTime" :onTimeUpdate="onTimeUpdate" />
-      <VideoTimeDisplay :onTimeUpdate="onTimeUpdate" />
+    <video
+      ref="videoElement"
+      @click="togglePlay"
+      @play="onPlay"
+      @pause="onPause"
+      class="video-element"
+    ></video>
+
+    <!-- Кнопка поверх видео -->
+    <PlayButton v-if="!isPlaying" @togglePlay="togglePlay" class="play-overlay" />
+
+    <div class="controls-wrapper">
+      <div class="controls">
+        <PlayButton @togglePlay="togglePlay" />
+        <TimeProgressBar :onUpdateProgress="setVideoTime" />
+        <VideoTimeDisplay />
+        <VolumeControl />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useVideoStore } from '@/stores/useVideoStore'
 import { storeToRefs } from 'pinia'
 import Hls from 'hls.js'
-import ProgressBar from './ProgressBar.vue'
 import VideoTimeDisplay from './VideoTimeDisplay.vue'
 import PlayButton from './PlayButton.vue'
+import TimeProgressBar from './TimeProgressBar.vue'
+import VolumeControl from './VolumeControl.vue'
 
 const videoElement = ref(null)
 const videoStore = useVideoStore()
 
 // Используем состояния из стора
-const { isPlaying } = storeToRefs(videoStore)
+const { isPlaying, volume } = storeToRefs(videoStore)
 
 const loadVideoFile = (source) => {
   if (Hls.isSupported()) {
@@ -39,13 +53,21 @@ onMounted(() => {
   loadVideoFile(
     'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8'
   )
+
+  videoElement.value.volume = volume.value
+
   videoElement.value.addEventListener('loadedmetadata', function () {
     videoStore.setCurrentTime(videoElement.value.currentTime)
     videoStore.setDuration(videoElement.value.duration)
   })
 
   // Обновляем текущее время в сторе
-  onTimeUpdate(setStoreTime)
+  videoElement.value.addEventListener('timeupdate', setStoreTime)
+})
+
+// Очищаем обработчики при демонтировании
+onUnmounted(() => {
+  videoElement.value.removeEventListener('timeupdate', setStoreTime)
 })
 
 // Управление воспроизведением
@@ -65,10 +87,6 @@ const onPause = () => {
   isPlaying.value = false
 }
 
-function onTimeUpdate(func) {
-  videoElement.value?.addEventListener('timeupdate', func)
-}
-
 function setStoreTime() {
   videoStore.setCurrentTime(videoElement.value.currentTime)
 }
@@ -85,24 +103,58 @@ function setVideoTime(time) {
 
 .video-element {
   width: 100%;
+  cursor: pointer;
 }
 
-.controls {
+.play-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20%;
+  transition: opacity 0.2s ease;
+}
+
+.play-overlay:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.controls-wrapper {
   position: absolute;
   right: 0;
   bottom: 0;
   left: 0;
+  width: 70%;
+  margin: 0 auto;
+  overflow: hidden; /* Обрезаем элементы, которые выходят за пределы */
+}
+
+.controls {
   display: flex;
   align-items: center;
   justify-content: space-around;
   gap: 20px;
-  width: calc(100% - 200px);
+  width: 100%;
   background: rgba(240, 240, 240, 0.25);
   border-radius: 15px 15px 0 0;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10.2px);
   -webkit-backdrop-filter: blur(10.2px);
   padding: 20px 20px 15px 20px;
-  margin: 0 auto;
+  user-select: none;
+
+  transform: translateY(100%);
+  transition:
+    transform 0.3s ease-in-out,
+    opacity 0.3s ease-in-out;
+  opacity: 0;
+}
+
+.video-player:hover .controls {
+  transform: translateY(0);
+  opacity: 1;
 }
 </style>
