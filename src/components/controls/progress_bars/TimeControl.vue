@@ -5,91 +5,84 @@
     @touchstart="startDragging"
     class="progress-container"
   >
-    <div class="progress-bar shadow crosses" :style="{ width: progress + '%' }"></div>
+    <div class="progress-bar shadow crosses" :style="{ width: updateProgress + '%' }"></div>
   </div>
 </template>
 
-<script setup>
-import { onBeforeUnmount, ref, watch } from 'vue'
+<script setup lang="ts">
+import { useVideoPlayerStore } from '@/stores/useVideoStore'
+import { storeToRefs } from 'pinia'
+import { computed, ref } from 'vue'
 
-const emit = defineEmits(['get-progress'])
+const videoPlayerStore = useVideoPlayerStore()
+const { isPlaying, isDragging, duration, currentTime } = storeToRefs(videoPlayerStore)
+const isPlay = ref(isPlaying.value)
 
+const progressContainer = ref<HTMLDivElement | null>(null)
 const progress = ref(0)
-const progressContainer = ref(null)
-const isDragging = ref(false) // Флаг для отслеживания перетаскивания
 
-const props = defineProps({
-  newProgress: Number
+const updateProgress = computed(() => {
+  if (isDragging.value) {
+    return progress.value
+  } else {
+    return (currentTime.value / duration.value) * 100
+  }
 })
 
-onBeforeUnmount(() => {
-  stopDragging()
-})
-
-function startDragging(event) {
+const startDragging = (event: MouseEvent | TouchEvent) => {
   isDragging.value = true
+  isPlay.value = isPlaying.value
+  videoPlayerStore.pause()
+
   calculateProgress(event)
 
   // Добавляем обработчики для отслеживания мыши и тача
-  window.addEventListener('mousemove', updateProgress)
+  window.addEventListener('mousemove', calculateProgress)
   window.addEventListener('mouseup', stopDragging)
-  window.addEventListener('touchmove', updateProgress)
+  window.addEventListener('touchmove', calculateProgress)
   window.addEventListener('touchend', stopDragging)
 }
 
-function stopDragging() {
+const stopDragging = () => {
+  videoPlayerStore.setProgress(progress.value)
+  videoPlayerStore.setCurrentTime((progress.value / 100) * duration.value)
+
   isDragging.value = false
+  if (isPlay.value) {
+    videoPlayerStore.play()
+  }
 
   // Удаляем обработчики
-  window.removeEventListener('mousemove', updateProgress)
+  window.removeEventListener('mousemove', calculateProgress)
+  window.removeEventListener('touchmove', calculateProgress)
   window.removeEventListener('mouseup', stopDragging)
-  window.removeEventListener('touchmove', updateProgress)
   window.removeEventListener('touchend', stopDragging)
 }
 
-function updateProgress(event) {
-  if (isDragging.value) {
-    calculateProgress(event)
-  }
-}
-
-function calculateProgress(event) {
+const calculateProgress = (event: MouseEvent | TouchEvent) => {
+  if (!progressContainer.value) return
+  // координаты контейнера
   const containerRect = progressContainer.value.getBoundingClientRect()
+  // ширина контейнера
+  const containerWidth = progressContainer.value.offsetWidth
 
-  const containerWidth = progressContainer.value.offsetWidth // ширина контейнера
   const clickX =
     event instanceof TouchEvent
       ? event.touches[0].clientX - containerRect.left
       : event.clientX - containerRect.left
-
   const clampedX = Math.max(0, Math.min(containerWidth, clickX))
-
   // вычисляем процент прогресса
   const newProgress = (clampedX / containerWidth) * 100
-
   // Ограничиваем значения от 0 до 100
-  const clampedProgress = Math.max(0, Math.min(100, newProgress))
-
-  progress.value = clampedProgress
-
-  emit('get-progress', progress.value)
+  progress.value = Math.max(0, Math.min(100, newProgress))
 }
-
-// Функция для обновления прогресса при воспроизведении видео
-function updateVideoProgress() {
-  if (!isDragging.value) {
-    progress.value = props.newProgress
-  }
-}
-
-watch(() => props.newProgress, updateVideoProgress)
 </script>
 
 <style scoped>
 .progress-container {
   display: inline-block;
   width: 100%;
-  height: 10px;
+  height: 6px;
   border-radius: 3px;
   background: #faf7f0;
   user-select: none;

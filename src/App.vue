@@ -4,12 +4,8 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import VideoPlayer from './components/VideoPlayer.vue'
 </script>
 
-<style scoped>
-.container {
-  margin: 30px auto;
-}
-</style>
+<style scoped></style>
